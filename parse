@@ -1,0 +1,130 @@
+#!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
+const argv = require('yargs');
+const chalk = require('chalk');
+const split = require('split');
+const ora = require('ora');
+
+const args = argv
+  .options({
+    input: {
+      alias: 'i',
+      describe: 'Path to input.txt file',
+      demandOption: true,
+    },
+    pattern: {
+      alias: 'p',
+      describe: 'Path to pattern.txt file',
+      demandOption: true,
+    },
+    mode: {
+      alias: 'm',
+      describe: 'Which mode to apply?',
+      default: 1,
+    },
+  })
+  .help()
+  .usage(
+    './$0 --input path/to/input.txt --pattern path/to/patterns.txt --mode [1|2|3]',
+  ).argv;
+
+const modes = [1, 2, 3];
+const baseDir = __dirname;
+
+const pathToInput = path.join(baseDir, args.input);
+const pathToPaterns = path.join(baseDir, args.pattern);
+const mode = args.mode;
+
+if (!modes.includes(mode)) {
+  console.log(chalk.red('Error: Mode should be 1, 2 or 3'));
+  return;
+}
+
+if (!fs.existsSync(pathToInput)) {
+  console.log(
+    chalk.red(`Error: Could not find input file in path ${pathToInput}`),
+  );
+  return;
+}
+
+if (!fs.existsSync(pathToPaterns)) {
+  console.log(
+    chalk.red(`Error: Could not find patterns file in path ${pathToPaterns}`),
+  );
+  return;
+}
+
+function exactMatch(spinner, pattern, input) {
+  if (pattern === input) {
+    spinner.succeed(chalk.green(input));
+  }
+}
+
+function includesMatch(spinner, pattern, input) {
+  const r = new RegExp(pattern);
+  const match = r.exec(input);
+  if (match) {
+    spinner.succeed(
+      `${input.slice(0, match.index)}${chalk.green(
+        input.slice(match.index, pattern.length),
+      )}${input.slice(pattern.length)}`,
+    );
+  }
+}
+
+function editDistance(spinner, pattern, input) {
+  const distanceMatrix = Array(pattern.length + 1)
+    .fill(null)
+    .map(() => Array(input.length + 1).fill(null));
+
+  for (let i = 0; i <= input.length; i += 1) {
+    distanceMatrix[0][i] = i;
+  }
+
+  for (let j = 0; j <= pattern.length; j += 1) {
+    distanceMatrix[j][0] = j;
+  }
+
+  for (let j = 1; j <= pattern.length; j += 1) {
+    for (let i = 1; i <= input.length; i += 1) {
+      const indicator = input[i - 1] === pattern[j - 1] ? 0 : 1;
+      distanceMatrix[j][i] = Math.min(
+        distanceMatrix[j][i - 1] + 1, // deletion
+        distanceMatrix[j - 1][i] + 1, // insertion
+        distanceMatrix[j - 1][i - 1] + indicator, // substitution
+      );
+    }
+  }
+  if (distanceMatrix[pattern.length][input.length] <= 1) {
+    spinner.succeed(chalk.green(input));
+  }
+}
+
+const hendlers = {
+  1: exactMatch,
+  2: includesMatch,
+  3: editDistance,
+};
+const spinner = ora('Finding patterns');
+spinner.start();
+
+const patterns = fs
+  .readFileSync(pathToPaterns, { encoding: 'utf-8' })
+  .toString()
+  .split('\n');
+fs.createReadStream(pathToInput, 'utf-8')
+  .pipe(split())
+  .on('data', function(line) {
+    spinner.start();
+    for (i = 0; i < patterns.length; i++) {
+      hendlers[mode](spinner, patterns[i], line);
+    }
+  })
+  .on('end', function(error) {
+    if (error) {
+      spinner.fail(error.message);
+    } else {
+      spinner.succeed('Done!');
+    }
+  });
