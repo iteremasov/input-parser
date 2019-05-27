@@ -10,10 +10,11 @@ _____________________________________________________________
 **Prerequisites to be installed:**
 1. node.js v10+
 2. npm 6+
+3. OS Ubuntu 14+
 
 **Installing:**
 1. Clone this repo:
-`git clone`
+`git clone https://github.com/iteremasov/input-parser.git`
 2. Go to repo dirname:
 `cd input-parser`
 3. Install deps:
