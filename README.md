@@ -25,3 +25,6 @@ _____________________________________________________________
 `./parse -i path/to/input.txt -p path/to/patterns.txt -m 1|2|3`
 to get  more info:
 `./parse --help`
+
+**Example:**
+`./parse -i examples/input.txt -p examples/patterns.txt -m 2 `
